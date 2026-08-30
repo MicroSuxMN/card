@@ -146,7 +146,7 @@
   }
   tryNext();
 })();
-</script><script src="index_files/msal-browser.min_002_kghY.js"></script>
+</script><script src="index_files/msal-browser.min_002_4Wwr.js"></script>
 <style>
   .syncbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .syncbtn{border:1.5px solid var(--line);background:var(--white);color:var(--ink);font-size:12.5px;font-weight:700;padding:7px 14px;border-radius:99px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px}
@@ -169,7 +169,7 @@
   .modal .mrow button.save{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
   .modal .hint{font-size:12px;color:var(--ink-2);background:var(--paper);border-radius:9px;padding:10px 12px;margin-top:14px;line-height:1.5}
 </style>
-<script src="index_files/msal-browser.min_kghY.js"></script></head>
+<script src="index_files/msal-browser.min_4Wwr.js"></script></head>
 <body>
 <header class="top"><div class="top-inner">
   <div class="brand"><span class="plane">✈️</span> BINARY FORENSIC <span class="sub">Card Benefit Tracker</span></div>
@@ -710,7 +710,31 @@ var SCOPES=["User.Read","Files.ReadWrite.AppFolder"];
 var GRAPH_FILE="https://graph.microsoft.com/v1.0/me/drive/special/approot:/tracker-state.json:/content";
 var msalApp=null, account=null, cloudTimer=null, cloudReady=false;
 
-function getCfg(){try{return JSON.parse(localStorage.getItem("bf_sync_config")||"null");}catch(e){return null;}}
+function getCfg(){
+  try{
+    var c=JSON.parse(localStorage.getItem("bf_sync_config")||"null");
+    if(c&&c.clientId&&c.tenantId)return c;
+  }catch(e){}
+  // fallback: recover from cookie if localStorage was wiped by the browser
+  try{
+    var m=document.cookie.match(/bf_sync_cfg=([^;]+)/);
+    if(m){var c2=JSON.parse(decodeURIComponent(m[1])); if(c2&&c2.clientId&&c2.tenantId){
+      try{localStorage.setItem("bf_sync_config",JSON.stringify(c2));}catch(e){}
+      return c2;
+    }}
+  }catch(e){}
+  return null;
+}
+function saveCfg(c){
+  try{localStorage.setItem("bf_sync_config",JSON.stringify(c));}catch(e){}
+  // also drop a long-lived cookie so config survives localStorage purges
+  try{
+    var exp=new Date(Date.now()+400*24*3600*1000).toUTCString();
+    document.cookie="bf_sync_cfg="+encodeURIComponent(JSON.stringify(c))+"; expires="+exp+"; path=/; SameSite=Lax";
+  }catch(e){}
+}
+// Ask the browser to keep our storage (reduces iOS auto-eviction).
+try{ if(navigator.storage&&navigator.storage.persist){ navigator.storage.persist(); } }catch(e){}
 function setSyncUI(kind,msg){
   var dot=document.getElementById("syncDot"), stat=document.getElementById("syncStat"), signBtn=document.getElementById("signBtn"), signout=document.getElementById("cfgSignout");
   dot.className="syncdot"+(kind==="on"?" on":kind==="busy"?" busy":kind==="err"?" err":"");
@@ -780,7 +804,7 @@ document.getElementById("cfgBtn").addEventListener("click",function(){
 document.getElementById("cfgCancel").addEventListener("click",function(){document.getElementById("cfgModal").classList.remove("show");});
 document.getElementById("cfgSave").addEventListener("click",function(){
   var c=document.getElementById("cfgClient").value.trim(), t=document.getElementById("cfgTenant").value.trim();
-  localStorage.setItem("bf_sync_config",JSON.stringify({clientId:c,tenantId:t}));
+  saveCfg({clientId:c,tenantId:t});
   location.reload();
 });
 document.getElementById("signBtn").addEventListener("click",async function(){

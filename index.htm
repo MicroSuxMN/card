@@ -127,7 +127,26 @@
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
-<script src="Card%20Benefit%20Tracker%20%E2%80%94%20Binary%20Forensic%20v13_files/msal-browser.min_PYhh.js"></script>
+<script>
+/* Load MSAL with fallbacks. If one CDN is blocked, try the next. */
+(function(){
+  var sources=[
+    "https://alcdn.msauth.net/browser/3.28.1/js/msal-browser.min.js",
+    "https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js",
+    "https://unpkg.com/@azure/msal-browser@3.28.1/lib/msal-browser.min.js"
+  ];
+  var i=0;
+  function tryNext(){
+    if(i>=sources.length){ window.__msalFailed=true; return; }
+    var s=document.createElement("script");
+    s.src=sources[i++];
+    s.onload=function(){ window.__msalLoaded=true; if(window.__afterMsal)window.__afterMsal(); };
+    s.onerror=tryNext;
+    document.head.appendChild(s);
+  }
+  tryNext();
+})();
+</script><script src="index_files/msal-browser.min_002_kghY.js"></script>
 <style>
   .syncbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .syncbtn{border:1.5px solid var(--line);background:var(--white);color:var(--ink);font-size:12.5px;font-weight:700;padding:7px 14px;border-radius:99px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px}
@@ -150,7 +169,7 @@
   .modal .mrow button.save{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
   .modal .hint{font-size:12px;color:var(--ink-2);background:var(--paper);border-radius:9px;padding:10px 12px;margin-top:14px;line-height:1.5}
 </style>
-</head>
+<script src="index_files/msal-browser.min_kghY.js"></script></head>
 <body>
 <header class="top"><div class="top-inner">
   <div class="brand"><span class="plane">✈️</span> BINARY FORENSIC <span class="sub">Card Benefit Tracker</span></div>
@@ -702,7 +721,17 @@ function setSyncUI(kind,msg){
 async function initSync(){
   var cfg=getCfg();
   if(!cfg||!cfg.clientId||!cfg.tenantId){ setSyncUI("off","Local only"); return; }
-  if(typeof msal==="undefined"){ setSyncUI("err","Sync library blocked"); return; }
+  // Wait for the MSAL library to finish loading (it loads async with CDN fallbacks).
+  if(typeof msal==="undefined" && !window.__msalFailed){
+    setSyncUI("busy","Loading sign-in…");
+    await new Promise(function(res){
+      if(window.__msalLoaded){res();return;}
+      window.__afterMsal=res;
+      // safety timeout
+      setTimeout(res,8000);
+    });
+  }
+  if(typeof msal==="undefined"){ setSyncUI("err","Sign-in library blocked — check connection"); return; }
   try{
     msalApp=new msal.PublicClientApplication({
       auth:{clientId:cfg.clientId, authority:"https://login.microsoftonline.com/"+cfg.tenantId, redirectUri:window.location.origin+window.location.pathname},
@@ -714,7 +743,7 @@ async function initSync(){
     else{var a=msalApp.getAllAccounts(); if(a.length)account=a[0];}
     if(account){ setSyncUI("busy","Syncing…"); cloudReady=true; await pullFromCloud(); }
     else setSyncUI("signedout","Not signed in");
-  }catch(e){ console.error("sync init",e); setSyncUI("err","Sync error"); }
+  }catch(e){ console.error("sync init",e); setSyncUI("err","Sync error — see console"); }
 }
 async function getToken(){
   var req={scopes:SCOPES, account:account};

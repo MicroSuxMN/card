@@ -94,6 +94,9 @@
   .countrow .amtfield{border-color:#c3d4ea}
   .countrow .cinfo{font-size:12.5px;color:var(--ink-2);font-weight:600}
   .countrow .cval{font-size:14px;font-weight:800;color:var(--accent-2)}
+  .countrow .stepper{display:flex;align-items:center;gap:0}
+  .countrow .stepper .amtfield{padding:4px 6px;margin:0;border-radius:0}
+  .countrow .stepper .amtfield input{width:52px;text-align:center}
   .countrow-multi{flex-direction:column;align-items:stretch;gap:8px}
   .pcount{display:flex;align-items:center;gap:10px}
   .pcount .pcname{font-size:13px;font-weight:700;color:var(--ink);min-width:64px}
@@ -723,7 +726,11 @@ function render(){
         const isValue=b.per>0;
         const goal=b.goal?` of ${b.goal}`:"";
         control=`<div class="countrow">
-          <div class="amtfield"><input type="number" min="0" ${b.goal?`max="${b.goal}"`:""} step="1" value="${n||''}" placeholder="0" data-cntkey="${k}"></div>
+          <div class="stepper">
+            <button type="button" class="stepbtn" data-step="-1" data-cntkey="${k}" aria-label="Decrease ${b.name}">\u2212</button>
+            <div class="amtfield"><input type="number" min="0" ${b.goal?`max="${b.goal}"`:""} step="1" value="${n||''}" placeholder="0" data-cntkey="${k}" aria-label="${b.name} count"></div>
+            <button type="button" class="stepbtn" data-step="1" data-cntkey="${k}" aria-label="Increase ${b.name}">+</button>
+          </div>
           ${isValue
             ? `<span class="cinfo">${n}${goal} visits × ${money(b.per)} =</span><span class="cval">${money(val)} of value</span>`
             : `<span class="cinfo">logged so far</span><span class="cval">${b.goal?(n+" of "+b.goal+" "+(b.unit||"")):(n+" of 15+ nights")}</span>`}
@@ -818,9 +825,21 @@ document.addEventListener("touchend",e=>{
 document.addEventListener("click",e=>{
   const step=e.target.closest(".stepbtn");
   if(step){
-    const key=step.dataset.visitkey;
+    const key=step.dataset.visitkey||step.dataset.cntkey;
     const cur=parseInt(state[key])||0;
-    setVisitCount(key, cur+parseInt(step.dataset.step));
+    if(step.dataset.visitkey){
+      setVisitCount(key, cur+parseInt(step.dataset.step));
+    }else{
+      const input=document.querySelector('input[data-cntkey="'+key+'"]');
+      if(input){
+        let next=cur+parseInt(step.dataset.step);
+        const min=input.min===""?0:Number(input.min);
+        const max=input.max===""?Infinity:Number(input.max);
+        next=Math.max(min,Math.min(max,next));
+        input.value=next||"";
+        input.dispatchEvent(new Event("input",{bubbles:true}));
+      }
+    }
     return;
   }
   const lbl=e.target.closest(".box label");

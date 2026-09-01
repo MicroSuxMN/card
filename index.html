@@ -1022,8 +1022,12 @@ async function getToken(){
   var req={scopes:SCOPES, account:account};
   try{ var r=await msalApp.acquireTokenSilent(req); return r.accessToken; }
   catch(e){
-    try{ var r2=await msalApp.acquireTokenPopup(req); if(r2&&r2.account)account=r2.account; return r2.accessToken; }
-    catch(e2){ console.error("token",e2); setSyncUI("err","Sign-in needed"); return null; }
+    // Silent refresh failed (session expired). iOS Safari blocks popups not tied to a
+    // tap, so DON'T auto-open one here — surface the Sign in button and let the user tap.
+    console.warn("silent token failed, need interactive sign-in", e);
+    account=null;
+    setSyncUI("signedout","Tap Sign in to reconnect");
+    return null;
   }
 }
 async function pullFromCloud(){
@@ -1061,10 +1065,16 @@ document.getElementById("cfgSave").addEventListener("click",function(){
 });
 document.getElementById("signBtn").addEventListener("click",async function(){
   if(!msalApp)return;
+  setSyncUI("busy","Opening sign-in…");
   try{
     var r=await msalApp.loginPopup({scopes:SCOPES});
     if(r&&r.account){ account=r.account; setSyncUI("busy","Syncing…"); cloudReady=true; await pullFromCloud(); }
-  }catch(e){ console.error("login",e); setSyncUI("err","Sign-in failed"); }
+  }catch(e){
+    console.warn("popup sign-in failed, falling back to redirect", e);
+    // iOS Safari can block the popup even from a tap. Redirect never gets blocked.
+    try{ await msalApp.loginRedirect({scopes:SCOPES}); }
+    catch(e2){ console.error("login",e2); setSyncUI("err","Sign-in failed"); }
+  }
 });
 document.getElementById("cfgSignout").addEventListener("click",async function(){
   if(msalApp&&account){ try{ await msalApp.logoutPopup({account:account}); }catch(e){ console.error(e); } }

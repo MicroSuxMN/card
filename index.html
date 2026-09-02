@@ -164,6 +164,7 @@
   .visititem{background:#eff4fb;border:1px dashed #c3d4ea;border-radius:10px;padding:9px 10px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;align-items:center}
   .visitname{font-size:12.5px;font-weight:800;color:var(--ink)}
   .visitdetail{font-size:10.5px;color:var(--ink-2);margin-top:1px}
+  .stepper{display:inline-flex;align-items:center;gap:0}
   .visititem .stepper{grid-row:1/3;grid-column:2;display:flex;align-items:center;gap:0}
   .visititem .amtfield{padding:4px 6px;margin:0;border-radius:0}
   .visititem .amtfield input{width:44px;text-align:center}
@@ -615,6 +616,18 @@ function setVisitCount(key,n,itemEl){
   const goal=item.goal?" of "+item.goal:"";
   if(value)value.textContent=n+goal+" visits \u00b7 "+money(n*(item.per||0))+" estimated value";
 }
+function setCounter(key,n,rowEl){
+  if(n<0)n=0;
+  const parts=key.split("_");
+  const card=CARDS.find(c=>c.id===parts[0]); const b=card.benefits[parseInt(parts[1])];
+  if(b.goal && n>b.goal)n=b.goal;
+  state[key]=n; save();
+  if(!rowEl)rowEl=document.querySelector('[data-cntkey="'+key+'"]').closest(".countrow");
+  const input=rowEl.querySelector('input[data-cntkey]'); if(input)input.value=n||"";
+  const cval=rowEl.querySelector(".cval");
+  if(cval)cval.textContent = b.per>0 ? (money(n*b.per)+" of value") : (b.goal?(n+" of "+b.goal+" "+(b.unit||"")):(n+" of 15+ nights"));
+  const cinfo=rowEl.querySelector(".cinfo"); if(cinfo&&b.per>0&&b.goal)cinfo.textContent=n+" of "+b.goal+" visits × "+money(b.per)+" =";
+}
 
 /* stylized but recognizable card face */
 function cardArt(card){
@@ -726,7 +739,11 @@ function render(){
         const isValue=b.per>0;
         const goal=b.goal?` of ${b.goal}`:"";
         control=`<div class="countrow">
-          <div class="amtfield"><input type="number" min="0" ${b.goal?`max="${b.goal}"`:""} step="1" value="${n||''}" placeholder="0" data-cntkey="${k}"></div>
+          <div class="stepper">
+            <button type="button" class="stepbtn" data-step="-1" data-cntkey="${k}" aria-label="minus">\u2212</button>
+            <div class="amtfield"><input type="number" min="0" ${b.goal?`max="${b.goal}"`:""} step="1" value="${n||''}" placeholder="0" data-cntkey="${k}"></div>
+            <button type="button" class="stepbtn" data-step="1" data-cntkey="${k}" aria-label="plus">+</button>
+          </div>
           ${isValue
             ? `<span class="cinfo">${n}${goal} visits × ${money(b.per)} =</span><span class="cval">${money(val)} of value</span>`
             : `<span class="cinfo">logged so far</span><span class="cval">${b.goal?(n+" of "+b.goal+" "+(b.unit||"")):(n+" of 15+ nights")}</span>`}
@@ -821,9 +838,14 @@ document.addEventListener("touchend",e=>{
 document.addEventListener("click",e=>{
   const step=e.target.closest(".stepbtn");
   if(step){
-    const key=step.dataset.visitkey;
-    const cur=parseInt(state[key])||0;
-    setVisitCount(key, cur+parseInt(step.dataset.step));
+    const d=parseInt(step.dataset.step);
+    if(step.dataset.visitkey){
+      const key=step.dataset.visitkey; const cur=parseInt(state[key])||0;
+      setVisitCount(key, cur+d);
+    } else if(step.dataset.cntkey){
+      const key=step.dataset.cntkey; const cur=parseInt(state[key])||0;
+      setCounter(key, cur+d);
+    }
     return;
   }
   const lbl=e.target.closest(".box label");
@@ -892,15 +914,8 @@ document.addEventListener("input",e=>{
     return;
   }
   if(e.target.matches("input[data-cntkey]")){
-    let n=parseInt(e.target.value)||0; if(n<0)n=0;
-    state[e.target.dataset.cntkey]=n; save();
-    const row=e.target.closest(".countrow"); const cval=row.querySelector(".cval");
-    // find per-visit value from the card data via key
-    const parts=e.target.dataset.cntkey.split("_"); // id_bi_cnt
-    const card=CARDS.find(c=>c.id===parts[0]); const b=card.benefits[parseInt(parts[1])];
-    if(cval)cval.textContent = b.per>0 ? (money(n*b.per)+" of value") : (b.goal?(n+" of "+b.goal+" "+(b.unit||"")):(n+" of 15+ nights"));
-    const cinfo=row.querySelector(".cinfo");if(cinfo&&b.per>0&&b.goal)cinfo.textContent=n+" of "+b.goal+" visits × "+money(b.per)+" =";
-    return; // do NOT recompute credit totals
+    setCounter(e.target.dataset.cntkey, parseInt(e.target.value)||0, e.target.closest(".countrow"));
+    return;
   }
   if(e.target.matches("input[data-freekey]")){
     let v=parseFloat(e.target.value)||0; if(v<0)v=0;

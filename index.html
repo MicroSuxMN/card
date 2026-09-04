@@ -831,8 +831,8 @@ function computeLoungeValue(){
       }
       // multi-person counters (Ritz: You/Ocean/Gavin)
       if(b.type==="counters" && b.items){
-        b.items.forEach((item,pi)=>{
-          const n=state[card.id+"_"+bi+"_"+pi]||0;
+        b.items.forEach((item,ii)=>{
+          const n=parseInt(state[card.id+"_"+bi+"_"+ii+"_visit"])||0;
           visits+=n; value+=n*(item.per||b.per||0);
         });
       }
